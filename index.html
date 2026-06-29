@@ -327,6 +327,100 @@
                 gap: var(--spacing-3);
                 flex-wrap: wrap;
             }
+            .dl-select {
+                font-family: var(--font-family);
+                font-size: 0.875rem;
+                font-weight: 700;
+                color: var(--neutral-900);
+                background: var(--neutral-white);
+                border: 1px solid var(--neutral-500);
+                border-radius: 4px;
+                padding: var(--spacing-2) var(--spacing-4);
+                cursor: pointer;
+            }
+            .dl-select:focus {
+                outline: 2px solid var(--primary-blue-700);
+                outline-offset: 2px;
+                border-color: var(--primary-blue-700);
+            }
+
+            /* ---- Mobile download button (小さいボタン) ---- */
+            .dl-fab {
+                display: none; /* デスクトップでは非表示 */
+                align-items: center;
+                gap: var(--spacing-1);
+                font-family: var(--font-family);
+                font-size: 0.8125rem;
+                font-weight: 700;
+                color: var(--neutral-white);
+                background: var(--primary-blue-900);
+                border: none;
+                border-radius: 999px;
+                padding: var(--spacing-2) var(--spacing-4);
+                cursor: pointer;
+                box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+            }
+            .dl-fab:active {
+                background: var(--primary-blue-800);
+            }
+
+            /* ---- Download modal ---- */
+            .modal-overlay {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.45);
+                z-index: 100;
+                align-items: flex-end;
+                justify-content: center;
+            }
+            .modal-overlay.open {
+                display: flex;
+            }
+            .modal {
+                background: var(--neutral-white);
+                border-radius: 12px 12px 0 0;
+                padding: var(--spacing-6);
+                width: 100%;
+                max-width: 480px;
+                display: flex;
+                flex-direction: column;
+                gap: var(--spacing-4);
+            }
+            .modal-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+            .modal-header .panel-title {
+                border: none;
+                padding: 0;
+            }
+            .modal-close {
+                background: none;
+                border: none;
+                font-size: 1.5rem;
+                line-height: 1;
+                color: var(--neutral-600);
+                cursor: pointer;
+                padding: var(--spacing-1);
+            }
+            .modal .dl-select {
+                width: 100%;
+            }
+            .modal .btn-dl {
+                width: 100%;
+                padding: var(--spacing-3);
+                font-size: 1rem;
+            }
+            @media (min-width: 768px) {
+                .modal-overlay {
+                    align-items: center;
+                }
+                .modal {
+                    border-radius: 12px;
+                }
+            }
             .btn-dl {
                 font-family: var(--font-family);
                 font-size: 0.875rem;
@@ -381,9 +475,92 @@
                 color: var(--primary-blue-900);
             }
 
-            @media (max-width: 900px) {
+            /* ---- Desktop: 各カラムを独立スクロール ---- */
+            @media (min-width: 901px) {
+                body {
+                    height: 100vh;
+                    overflow: hidden;
+                    display: flex;
+                    flex-direction: column;
+                }
+                header {
+                    flex: 0 0 auto;
+                }
                 .layout {
-                    grid-template-columns: 1fr;
+                    flex: 1 1 auto;
+                    min-height: 0;
+                    overflow: hidden;
+                    align-items: stretch;
+                }
+                /* 設定パネルだけが単独でスクロールする */
+                .panel {
+                    height: 100%;
+                    overflow-y: auto;
+                }
+                /* プレビューは常に表示され続ける */
+                .preview-area {
+                    height: 100%;
+                    overflow-y: auto;
+                    align-content: start;
+                }
+            }
+
+            /* ---- Mobile: 画像を上部固定、フォームを下部に ---- */
+            @media (max-width: 900px) {
+                /* ヘッダーを1行に収める */
+                header {
+                    flex-wrap: nowrap;
+                    padding: var(--spacing-4);
+                }
+                header h1 {
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    min-width: 0;
+                }
+                header span {
+                    display: none; /* サブテキストは非表示 */
+                }
+                .repo-link {
+                    flex: 0 0 auto;
+                }
+                .repo-link-text {
+                    display: none; /* GitHubはアイコンのみ */
+                }
+                .layout {
+                    display: flex;
+                    flex-direction: column;
+                    padding: var(--spacing-4);
+                    gap: var(--spacing-4);
+                }
+                /* プレビュー一式（画像＋DLボタン）を画面上部に固定し、
+                   下のフォームをスクロールしても見え続ける */
+                .preview-area {
+                    order: -1;
+                    position: sticky;
+                    top: 0;
+                    z-index: 10;
+                    background: var(--neutral-50);
+                    padding-bottom: var(--spacing-2);
+                    box-shadow: 0 4px 8px -4px rgba(0, 0, 0, 0.12);
+                }
+                .canvas-wrapper {
+                    padding: var(--spacing-3);
+                    position: relative;
+                }
+                /* 固定ヘッダーが大きくなりすぎないよう高さを制限 */
+                #thumbnail-canvas {
+                    max-height: 38vh;
+                }
+                /* スマホではインラインのDL欄を隠し、小ボタン＋モーダルに */
+                .download-section {
+                    display: none;
+                }
+                .dl-fab {
+                    display: inline-flex;
+                    position: absolute;
+                    right: var(--spacing-3);
+                    bottom: var(--spacing-3);
                 }
             }
         </style>
@@ -422,7 +599,7 @@
                         d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58 0-.29-.01-1.04-.02-2.05-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.33-1.76-1.33-1.76-1.09-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.25 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.62-5.49 5.92.43.37.81 1.1.81 2.22 0 1.61-.01 2.9-.01 3.29 0 .32.21.7.82.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z"
                     />
                 </svg>
-                GitHub
+                <span class="repo-link-text">GitHub</span>
             </a>
         </header>
 
@@ -524,27 +701,75 @@ Webデザインの新潮流</textarea
             <div class="preview-area">
                 <div class="canvas-wrapper">
                     <canvas id="thumbnail-canvas"></canvas>
+                    <!-- スマホ用の小さいダウンロードボタン -->
+                    <button
+                        class="dl-fab"
+                        onclick="openDlModal()"
+                        aria-label="ダウンロード"
+                    >
+                        <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2.5"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                        >
+                            <path d="M12 3v12M7 11l5 5 5-5M5 21h14" />
+                        </svg>
+                        保存
+                    </button>
                 </div>
                 <div class="download-section">
                     <span class="download-label">ダウンロード:</span>
-                    <div class="btn-group">
-                        <button
-                            class="btn-dl primary"
-                            onclick="download('png')"
-                        >
-                            PNG
-                        </button>
-                        <button class="btn-dl" onclick="download('jpg')">
-                            JPG
-                        </button>
-                        <button class="btn-dl" onclick="download('webp')">
-                            WebP
-                        </button>
-                        <button class="btn-dl" onclick="download('svg')">
-                            SVG
-                        </button>
-                    </div>
+                    <select id="dl-format" class="dl-select">
+                        <option value="jpg" selected>JPG</option>
+                        <option value="png">PNG</option>
+                        <option value="webp">WebP</option>
+                        <option value="svg">SVG</option>
+                    </select>
+                    <button
+                        class="btn-dl primary"
+                        onclick="download(document.getElementById('dl-format').value)"
+                    >
+                        ダウンロード
+                    </button>
                 </div>
+            </div>
+        </div>
+
+        <!-- スマホ用ダウンロードモーダル -->
+        <div
+            class="modal-overlay"
+            id="dl-modal"
+            onclick="if(event.target===this)closeDlModal()"
+        >
+            <div class="modal" role="dialog" aria-modal="true">
+                <div class="modal-header">
+                    <span class="panel-title">ダウンロード</span>
+                    <button
+                        class="modal-close"
+                        onclick="closeDlModal()"
+                        aria-label="閉じる"
+                    >
+                        &times;
+                    </button>
+                </div>
+                <select id="dl-format-m" class="dl-select">
+                    <option value="jpg" selected>JPG</option>
+                    <option value="png">PNG</option>
+                    <option value="webp">WebP</option>
+                    <option value="svg">SVG</option>
+                </select>
+                <button
+                    class="btn-dl primary"
+                    onclick="download(document.getElementById('dl-format-m').value); closeDlModal();"
+                >
+                    ダウンロード
+                </button>
             </div>
         </div>
 
@@ -823,6 +1048,14 @@ Webデザインの新潮流</textarea
                         .slice(0, 20) || "thumbnail";
                 const size = `${activeSize.id}_${activeSize.w}x${activeSize.h}`;
                 return `${title}_${size}.${ext}`;
+            }
+
+            // ---- スマホ用ダウンロードモーダル ----
+            function openDlModal() {
+                document.getElementById("dl-modal").classList.add("open");
+            }
+            function closeDlModal() {
+                document.getElementById("dl-modal").classList.remove("open");
             }
 
             function download(format) {
