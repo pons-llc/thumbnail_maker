@@ -1,0 +1,958 @@
+<!doctype html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>サムネイルメーカー</title>
+        <meta
+            name="description"
+            content="テキストを入力するだけでサムネイル画像を生成・ダウンロードできるツール。クエリパラメータで初期値を指定可能。"
+        />
+        <!--
+          AI Usage Guide — Thumbnail Maker
+          ==================================
+          This page generates thumbnail images from text inputs.
+          All fields can be pre-filled via URL query parameters:
+
+          Parameters:
+            title      : Main title text (supports \n for line breaks)
+            subtitle   : Subtitle text
+            author     : Author name (displayed bottom-right)
+            theme      : One of: classic | dark | blue  (default: classic)
+            size       : One of: note | youtube | ogp | square | twitter  (default: note)
+            titleSize  : Title font size in px, 24-120  (default: 96)
+            subSize    : Subtitle font size in px, 12-72  (default: 48)
+            authorSize : Author font size in px, 10-48  (default: 24)
+
+          Example URL:
+            index.html?title=AIが変える未来&subtitle=2025年の技術トレンド&author=山田花子&theme=dark&size=note
+
+          Download:
+            Use the PNG / JPG / WebP / SVG buttons visible on the page.
+            There is no server-side API; all rendering is done in-browser via Canvas.
+        -->
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            /* DADS Design Tokens */
+            :root {
+                --primary-blue-900: #003cb8;
+                --primary-blue-800: #0050d0;
+                --primary-blue-700: #0064e6;
+                --primary-blue-100: #e8f1fe;
+                --primary-blue-50: #f4f8ff;
+                --neutral-900: #1a1a1c;
+                --neutral-700: #474749;
+                --neutral-600: #626264;
+                --neutral-500: #767678;
+                --neutral-300: #b4b4b6;
+                --neutral-200: #d9d9db;
+                --neutral-100: #f0f0f2;
+                --neutral-50: #f8f8fa;
+                --neutral-white: #ffffff;
+
+                --spacing-1: 4px;
+                --spacing-2: 8px;
+                --spacing-3: 12px;
+                --spacing-4: 16px;
+                --spacing-5: 20px;
+                --spacing-6: 24px;
+                --spacing-8: 32px;
+                --spacing-10: 40px;
+                --spacing-12: 48px;
+
+                --font-family: "Noto Sans JP", sans-serif;
+            }
+
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            body {
+                font-family: var(--font-family);
+                font-size: 1rem;
+                line-height: 1.7;
+                color: var(--neutral-900);
+                background: var(--neutral-50);
+                min-height: 100vh;
+            }
+
+            header {
+                background: var(--neutral-white);
+                border-bottom: 1px solid var(--neutral-200);
+                padding: var(--spacing-4) var(--spacing-8);
+                display: flex;
+                align-items: center;
+                gap: var(--spacing-3);
+            }
+            header h1 {
+                font-size: 1.25rem;
+                font-weight: 700;
+                color: var(--primary-blue-900);
+            }
+            header span {
+                font-size: 0.875rem;
+                color: var(--neutral-600);
+            }
+
+            .layout {
+                display: grid;
+                grid-template-columns: 360px 1fr;
+                gap: var(--spacing-6);
+                padding: var(--spacing-6) var(--spacing-8);
+                max-width: 1400px;
+                margin: 0 auto;
+            }
+
+            /* ---- Panel ---- */
+            .panel {
+                background: var(--neutral-white);
+                border: 1px solid var(--neutral-200);
+                border-radius: 8px;
+                padding: var(--spacing-6);
+                display: flex;
+                flex-direction: column;
+                gap: var(--spacing-6);
+            }
+            .panel-title {
+                font-size: 1rem;
+                font-weight: 700;
+                color: var(--neutral-900);
+                padding-bottom: var(--spacing-3);
+                border-bottom: 2px solid var(--primary-blue-900);
+            }
+
+            /* ---- Form ---- */
+            .form-group {
+                display: flex;
+                flex-direction: column;
+                gap: var(--spacing-2);
+            }
+            label {
+                font-size: 0.875rem;
+                font-weight: 700;
+                color: var(--neutral-700);
+            }
+            input[type="text"],
+            textarea {
+                font-family: var(--font-family);
+                font-size: 1rem;
+                border: 1px solid var(--neutral-500);
+                border-radius: 4px;
+                padding: var(--spacing-3) var(--spacing-4);
+                color: var(--neutral-900);
+                background: var(--neutral-white);
+                transition: border-color 0.15s;
+                resize: vertical;
+            }
+            input[type="text"]:focus,
+            textarea:focus {
+                outline: 2px solid var(--primary-blue-700);
+                outline-offset: 2px;
+                border-color: var(--primary-blue-700);
+            }
+
+            /* ---- Slider ---- */
+            .slider-row {
+                display: flex;
+                align-items: center;
+                gap: var(--spacing-3);
+            }
+            input[type="range"] {
+                flex: 1;
+                accent-color: var(--primary-blue-900);
+                height: 4px;
+                cursor: pointer;
+            }
+            .slider-val {
+                font-size: 0.875rem;
+                font-weight: 700;
+                color: var(--primary-blue-900);
+                min-width: 36px;
+                text-align: right;
+            }
+
+            /* ---- Themes ---- */
+            .theme-grid {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: var(--spacing-3);
+            }
+            .theme-btn {
+                border: 2px solid var(--neutral-200);
+                border-radius: 6px;
+                padding: var(--spacing-2);
+                cursor: pointer;
+                background: none;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: var(--spacing-1);
+                transition: border-color 0.15s;
+            }
+            .theme-btn:hover {
+                border-color: var(--primary-blue-700);
+            }
+            .theme-btn.active {
+                border-color: var(--primary-blue-900);
+                background: var(--primary-blue-50);
+            }
+            .theme-preview {
+                width: 100%;
+                aspect-ratio: 16/9;
+                border-radius: 3px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 2px;
+            }
+            .theme-preview .tp-title {
+                width: 70%;
+                height: 5px;
+                border-radius: 2px;
+            }
+            .theme-preview .tp-sub {
+                width: 50%;
+                height: 3px;
+                border-radius: 2px;
+                opacity: 0.7;
+            }
+            .theme-preview .tp-author {
+                width: 35%;
+                height: 3px;
+                border-radius: 2px;
+                opacity: 0.5;
+            }
+            .theme-name {
+                font-size: 0.75rem;
+                color: var(--neutral-700);
+                font-weight: 700;
+            }
+
+            /* ---- Canvas area ---- */
+            .preview-area {
+                display: flex;
+                flex-direction: column;
+                gap: var(--spacing-4);
+            }
+            .canvas-wrapper {
+                background: var(--neutral-100);
+                border: 1px solid var(--neutral-200);
+                border-radius: 8px;
+                padding: var(--spacing-4);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            #thumbnail-canvas {
+                max-width: 100%;
+                border-radius: 4px;
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+            }
+
+            /* ---- Download ---- */
+            .download-section {
+                background: var(--neutral-white);
+                border: 1px solid var(--neutral-200);
+                border-radius: 8px;
+                padding: var(--spacing-5) var(--spacing-6);
+                display: flex;
+                align-items: center;
+                gap: var(--spacing-4);
+                flex-wrap: wrap;
+            }
+            .download-label {
+                font-size: 0.875rem;
+                font-weight: 700;
+                color: var(--neutral-700);
+                white-space: nowrap;
+            }
+            .btn-group {
+                display: flex;
+                gap: var(--spacing-3);
+                flex-wrap: wrap;
+            }
+            .btn-dl {
+                font-family: var(--font-family);
+                font-size: 0.875rem;
+                font-weight: 700;
+                border: 2px solid var(--primary-blue-900);
+                color: var(--primary-blue-900);
+                background: var(--neutral-white);
+                padding: var(--spacing-2) var(--spacing-5);
+                border-radius: 4px;
+                cursor: pointer;
+                transition:
+                    background 0.15s,
+                    color 0.15s;
+            }
+            .btn-dl:hover {
+                background: var(--primary-blue-900);
+                color: var(--neutral-white);
+            }
+            .btn-dl.primary {
+                background: var(--primary-blue-900);
+                color: var(--neutral-white);
+            }
+            .btn-dl.primary:hover {
+                background: var(--primary-blue-800);
+            }
+
+            /* ---- Size selector ---- */
+            .size-row {
+                display: flex;
+                gap: var(--spacing-2);
+                flex-wrap: wrap;
+            }
+            .size-btn {
+                font-family: var(--font-family);
+                font-size: 0.75rem;
+                font-weight: 700;
+                border: 1px solid var(--neutral-300);
+                background: var(--neutral-white);
+                color: var(--neutral-700);
+                padding: var(--spacing-1) var(--spacing-3);
+                border-radius: 4px;
+                cursor: pointer;
+                transition: all 0.15s;
+            }
+            .size-btn:hover {
+                border-color: var(--primary-blue-700);
+                color: var(--primary-blue-700);
+            }
+            .size-btn.active {
+                border-color: var(--primary-blue-900);
+                background: var(--primary-blue-100);
+                color: var(--primary-blue-900);
+            }
+
+            @media (max-width: 900px) {
+                .layout {
+                    grid-template-columns: 1fr;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#003CB8"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path d="M3 9h18M9 21V9" />
+            </svg>
+            <h1>サムネイルメーカー</h1>
+            <span>テキストだけでいい人のやつ</span>
+        </header>
+
+        <div class="layout">
+            <!-- Left: Controls -->
+            <aside class="panel">
+                <div class="panel-title">コンテンツ</div>
+
+                <div class="form-group">
+                    <label for="inp-title">タイトル</label>
+                    <textarea
+                        id="inp-title"
+                        rows="3"
+                        placeholder="メインタイトルを入力"
+                    >
+Webデザインの新潮流</textarea
+                    >
+                </div>
+                <div class="form-group">
+                    <label for="inp-sub">サブタイトル</label>
+                    <input
+                        type="text"
+                        id="inp-sub"
+                        placeholder="サブタイトルを入力"
+                        value="デジタル庁デザインシステムで学ぶ実践的UI設計"
+                    />
+                </div>
+                <div class="form-group">
+                    <label for="inp-author">著者</label>
+                    <input
+                        type="text"
+                        id="inp-author"
+                        placeholder="著者名を入力"
+                        value="田中 太郎"
+                    />
+                </div>
+
+                <div class="panel-title">フォントサイズ</div>
+                <div class="form-group">
+                    <label
+                        >タイトル
+                        <span class="slider-val" id="val-title-size"
+                            >96px</span
+                        ></label
+                    >
+                    <div class="slider-row">
+                        <input
+                            type="range"
+                            id="sl-title"
+                            min="24"
+                            max="120"
+                            value="96"
+                        />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label
+                        >サブタイトル
+                        <span class="slider-val" id="val-sub-size"
+                            >48px</span
+                        ></label
+                    >
+                    <div class="slider-row">
+                        <input
+                            type="range"
+                            id="sl-sub"
+                            min="12"
+                            max="72"
+                            value="48"
+                        />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label
+                        >著者
+                        <span class="slider-val" id="val-author-size"
+                            >24px</span
+                        ></label
+                    >
+                    <div class="slider-row">
+                        <input
+                            type="range"
+                            id="sl-author"
+                            min="10"
+                            max="48"
+                            value="24"
+                        />
+                    </div>
+                </div>
+
+                <div class="panel-title">テーマ</div>
+                <div class="theme-grid" id="theme-grid"></div>
+
+                <div class="panel-title">サイズ</div>
+                <div class="size-row" id="size-row"></div>
+            </aside>
+
+            <!-- Right: Preview + Download -->
+            <div class="preview-area">
+                <div class="canvas-wrapper">
+                    <canvas id="thumbnail-canvas"></canvas>
+                </div>
+                <div class="download-section">
+                    <span class="download-label">ダウンロード:</span>
+                    <div class="btn-group">
+                        <button
+                            class="btn-dl primary"
+                            onclick="download('png')"
+                        >
+                            PNG
+                        </button>
+                        <button class="btn-dl" onclick="download('jpg')">
+                            JPG
+                        </button>
+                        <button class="btn-dl" onclick="download('webp')">
+                            WebP
+                        </button>
+                        <button class="btn-dl" onclick="download('svg')">
+                            SVG
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // ---- Themes ----
+            const THEMES = [
+                {
+                    id: "classic",
+                    name: "クラシック",
+                    bg: "#FFFFFF",
+                    title: "#1A1A1C",
+                    sub: "#1A1A1C",
+                    author: "#474749",
+                    accent: "#003CB8",
+                    previewBg: "#FFFFFF",
+                    previewText: "#1A1A1C",
+                },
+                {
+                    id: "dark",
+                    name: "ダーク",
+                    bg: "#1A1A1C",
+                    title: "#FFFFFF",
+                    sub: "#FFFFFF",
+                    author: "#D9D9DB",
+                    accent: "#0064E6",
+                    previewBg: "#1A1A1C",
+                    previewText: "#FFFFFF",
+                },
+                {
+                    id: "blue",
+                    name: "ブルー",
+                    bg: "#003CB8",
+                    title: "#FFFFFF",
+                    sub: "#FFFFFF",
+                    author: "#E8F1FE",
+                    accent: "#FFFFFF",
+                    previewBg: "#003CB8",
+                    previewText: "#FFFFFF",
+                },
+            ];
+
+            const SIZES = [
+                { id: "note", label: "note (1280×670)", w: 1280, h: 670 },
+                { id: "youtube", label: "YouTube (1280×720)", w: 1280, h: 720 },
+                { id: "ogp", label: "OGP (1200×630)", w: 1200, h: 630 },
+                { id: "wide", label: "5:2 (1280×512)", w: 1280, h: 512 },
+                { id: "square", label: "Square (1080×1080)", w: 1080, h: 1080 },
+                { id: "twitter", label: "Twitter (1500×500)", w: 1500, h: 500 },
+            ];
+
+            let activeTheme = THEMES[0];
+            let activeSize = SIZES[0]; // note
+            let fontLoaded = false;
+
+            // Build theme buttons
+            const themeGrid = document.getElementById("theme-grid");
+            THEMES.forEach((t) => {
+                const btn = document.createElement("button");
+                btn.className =
+                    "theme-btn" + (t.id === activeTheme.id ? " active" : "");
+                btn.dataset.id = t.id;
+
+                const prev = document.createElement("div");
+                prev.className = "theme-preview";
+                prev.style.background = t.previewBg;
+                ["tp-title", "tp-sub", "tp-author"].forEach((cls) => {
+                    const bar = document.createElement("div");
+                    bar.className = cls;
+                    bar.style.background = t.previewText;
+                    prev.appendChild(bar);
+                });
+
+                const name = document.createElement("span");
+                name.className = "theme-name";
+                name.textContent = t.name;
+
+                btn.appendChild(prev);
+                btn.appendChild(name);
+                btn.addEventListener("click", () => {
+                    activeTheme = t;
+                    document
+                        .querySelectorAll(".theme-btn")
+                        .forEach((b) => b.classList.remove("active"));
+                    btn.classList.add("active");
+                    render();
+                });
+                themeGrid.appendChild(btn);
+            });
+
+            // Build size buttons
+            const sizeRow = document.getElementById("size-row");
+            SIZES.forEach((s) => {
+                const btn = document.createElement("button");
+                btn.className =
+                    "size-btn" + (s.id === activeSize.id ? " active" : "");
+                btn.dataset.id = s.id;
+                btn.textContent = s.label;
+                btn.addEventListener("click", () => {
+                    activeSize = s;
+                    document
+                        .querySelectorAll(".size-btn")
+                        .forEach((b) => b.classList.remove("active"));
+                    btn.classList.add("active");
+                    render();
+                });
+                sizeRow.appendChild(btn);
+            });
+
+            // Slider value display
+            function bindSlider(id, valId) {
+                const sl = document.getElementById(id);
+                const val = document.getElementById(valId);
+                sl.addEventListener("input", () => {
+                    val.textContent = sl.value + "px";
+                    render();
+                });
+            }
+            bindSlider("sl-title", "val-title-size");
+            bindSlider("sl-sub", "val-sub-size");
+            bindSlider("sl-author", "val-author-size");
+
+            ["inp-title", "inp-sub", "inp-author"].forEach((id) => {
+                document.getElementById(id).addEventListener("input", render);
+            });
+
+            // ---- Canvas render ----
+            const canvas = document.getElementById("thumbnail-canvas");
+            const ctx = canvas.getContext("2d");
+
+            function wrapText(ctx, text, maxWidth) {
+                const words = text.split("\n").flatMap((line) => {
+                    const parts = [];
+                    let w = "";
+                    for (const ch of line) {
+                        const test = w + ch;
+                        if (
+                            ctx.measureText(test).width > maxWidth &&
+                            w.length > 0
+                        ) {
+                            parts.push(w);
+                            w = ch;
+                        } else {
+                            w = test;
+                        }
+                    }
+                    if (w) parts.push(w);
+                    return parts;
+                });
+                return words;
+            }
+
+            function render() {
+                const W = activeSize.w;
+                const H = activeSize.h;
+                canvas.width = W;
+                canvas.height = H;
+
+                const t = activeTheme;
+                const titleSize = parseInt(
+                    document.getElementById("sl-title").value,
+                );
+                const subSize = parseInt(
+                    document.getElementById("sl-sub").value,
+                );
+                const authorSize = parseInt(
+                    document.getElementById("sl-author").value,
+                );
+                const titleText =
+                    document.getElementById("inp-title").value || "";
+                const subText = document.getElementById("inp-sub").value || "";
+                const authorText =
+                    document.getElementById("inp-author").value || "";
+
+                // Background
+                if (t.bg.startsWith("gradient:")) {
+                    const [, , c1, c2] = t.bg.split(",");
+                    const grad = ctx.createLinearGradient(0, 0, W, H);
+                    grad.addColorStop(0, c1);
+                    grad.addColorStop(1, c2);
+                    ctx.fillStyle = grad;
+                } else {
+                    ctx.fillStyle = t.bg;
+                }
+                ctx.fillRect(0, 0, W, H);
+
+                // Accent line (left edge)
+                ctx.fillStyle = t.accent;
+                ctx.fillRect(0, 0, Math.round(W * 0.008), H);
+
+                const padX = Math.round(W * 0.08);
+                const padY = Math.round(H * 0.1);
+                const contentW = W - padX * 2;
+
+                const FONT = "'Noto Sans JP', sans-serif";
+                ctx.textBaseline = "top";
+
+                // Pre-calculate block height for vertical centering
+                ctx.font = `700 ${titleSize}px ${FONT}`;
+                const titleLines = wrapText(ctx, titleText, contentW);
+                const titleLineH = titleSize * 1.35;
+                const titleBlockH = titleLines.length * titleLineH;
+
+                ctx.font = `400 ${subSize}px ${FONT}`;
+                const subLines = subText
+                    ? wrapText(ctx, subText, contentW)
+                    : [];
+                const subLineH = subSize * 1.5;
+                const subBlockH =
+                    subLines.length > 0 ? subLines.length * subLineH : 0;
+
+                const gap = subBlockH > 0 ? Math.round(H * 0.04) : 0;
+                const totalBlockH = titleBlockH + gap + subBlockH;
+
+                // Vertically center the text block
+                let y = Math.round((H - totalBlockH) / 2);
+
+                // Title
+                ctx.font = `700 ${titleSize}px ${FONT}`;
+                ctx.fillStyle = t.title;
+                titleLines.forEach((line) => {
+                    ctx.fillText(line, padX, y);
+                    y += titleLineH;
+                });
+
+                // Subtitle
+                if (subLines.length > 0) {
+                    y += gap;
+                    ctx.font = `400 ${subSize}px ${FONT}`;
+                    ctx.fillStyle = t.sub;
+                    subLines.forEach((line) => {
+                        ctx.fillText(line, padX, y);
+                        y += subLineH;
+                    });
+                }
+
+                // Author — bottom-right
+                if (authorText) {
+                    ctx.font = `400 ${authorSize}px ${FONT}`;
+                    ctx.textBaseline = "bottom";
+                    ctx.textAlign = "right";
+
+                    const authorY = H - padY;
+                    const textW = ctx.measureText(authorText).width;
+                    const dashW = Math.round(authorSize * 1.2);
+                    const authorX = W - padX;
+
+                    ctx.fillStyle = t.accent;
+                    ctx.fillRect(
+                        authorX - textW - dashW - Math.round(authorSize * 0.5),
+                        authorY - authorSize * 0.5,
+                        dashW,
+                        Math.max(2, Math.round(authorSize * 0.08)),
+                    );
+
+                    ctx.fillStyle = t.author;
+                    ctx.fillText(authorText, authorX, authorY);
+                    ctx.textAlign = "left";
+                    ctx.textBaseline = "top";
+                }
+            }
+
+            // Font load then render
+            document.fonts.ready.then(() => {
+                fontLoaded = true;
+                render();
+            });
+            // Fallback
+            setTimeout(render, 300);
+
+            // ---- Download ----
+            function getFilename(ext) {
+                const title =
+                    document
+                        .getElementById("inp-title")
+                        .value.replace(/\s+/g, "_")
+                        .slice(0, 20) || "thumbnail";
+                return `${title}.${ext}`;
+            }
+
+            function download(format) {
+                if (format === "svg") {
+                    downloadSVG();
+                    return;
+                }
+                const mimeMap = {
+                    png: "image/png",
+                    jpg: "image/jpeg",
+                    webp: "image/webp",
+                };
+                const mime = mimeMap[format];
+                const quality = format === "jpg" ? 0.92 : undefined;
+                const url =
+                    quality !== undefined
+                        ? canvas.toDataURL(mime, quality)
+                        : canvas.toDataURL(mime);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = getFilename(format);
+                a.click();
+            }
+
+            function downloadSVG() {
+                const W = activeSize.w;
+                const H = activeSize.h;
+                const t = activeTheme;
+                const titleSize = parseInt(
+                    document.getElementById("sl-title").value,
+                );
+                const subSize = parseInt(
+                    document.getElementById("sl-sub").value,
+                );
+                const authorSize = parseInt(
+                    document.getElementById("sl-author").value,
+                );
+                const titleText =
+                    document.getElementById("inp-title").value || "";
+                const subText = document.getElementById("inp-sub").value || "";
+                const authorText =
+                    document.getElementById("inp-author").value || "";
+
+                const padX = Math.round(W * 0.08);
+                const padY = Math.round(H * 0.1);
+                const FONT = "'Noto Sans JP', sans-serif";
+
+                // Build bg
+                let bgEl = "";
+                if (t.bg.startsWith("gradient:")) {
+                    const [, , c1, c2] = t.bg.split(",");
+                    bgEl = `<defs><linearGradient id="bg-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="${c1}"/>
+      <stop offset="100%" stop-color="${c2}"/>
+    </linearGradient></defs>
+    <rect width="${W}" height="${H}" fill="url(#bg-grad)"/>`;
+                } else {
+                    bgEl = `<rect width="${W}" height="${H}" fill="${t.bg}"/>`;
+                }
+
+                const accentLine = `<rect x="0" y="0" width="${Math.round(W * 0.008)}" height="${H}" fill="${t.accent}"/>`;
+
+                // Simple text (no wrap in SVG – use foreignObject workaround or just single line)
+                let textEls = "";
+                let y = padY + Math.round(H * 0.05);
+
+                // Title lines
+                const titleLines = titleText.split("\n");
+                const titleLineH = titleSize * 1.35;
+                titleLines.forEach((line) => {
+                    textEls += `<text x="${padX}" y="${y + titleSize}" font-family="${FONT}" font-size="${titleSize}" font-weight="700" fill="${t.title}">${escSvg(line)}</text>`;
+                    y += titleLineH;
+                });
+                y += Math.round(H * 0.04);
+
+                if (subText) {
+                    const subLines = subText.split("\n");
+                    const subLineH = subSize * 1.5;
+                    subLines.forEach((line) => {
+                        textEls += `<text x="${padX}" y="${y + subSize}" font-family="${FONT}" font-size="${subSize}" font-weight="400" fill="${t.sub}">${escSvg(line)}</text>`;
+                        y += subLineH;
+                    });
+                    y += Math.round(H * 0.04);
+                }
+
+                if (authorText) {
+                    const authorY = H - padY;
+                    const dashW = Math.round(authorSize * 1.2);
+                    textEls += `<text x="${W - padX}" y="${authorY}" font-family="${FONT}" font-size="${authorSize}" font-weight="400" fill="${t.author}" text-anchor="end" dominant-baseline="auto">${escSvg(authorText)}</text>`;
+                    textEls += `<rect x="${W - padX - 300 - dashW}" y="${authorY - authorSize * 0.5}" width="${dashW}" height="${Math.max(2, Math.round(authorSize * 0.08))}" fill="${t.accent}"/>`;
+                }
+
+                const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  ${bgEl}
+  ${accentLine}
+  ${textEls}
+</svg>`;
+
+                const blob = new Blob([svg], { type: "image/svg+xml" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = getFilename("svg");
+                a.click();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+            }
+
+            function escSvg(str) {
+                return str
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;");
+            }
+
+            // ---- Query parameter initialization ----
+            (function applyQueryParams() {
+                const p = new URLSearchParams(location.search);
+
+                const title = p.get("title");
+                const subtitle = p.get("subtitle");
+                const author = p.get("author");
+                const theme = p.get("theme");
+                const size = p.get("size");
+                const titleSize = p.get("titleSize");
+                const subSize = p.get("subSize");
+                const authorSize = p.get("authorSize");
+
+                if (title !== null)
+                    document.getElementById("inp-title").value = title.replace(
+                        /\\n/g,
+                        "\n",
+                    );
+                if (subtitle !== null)
+                    document.getElementById("inp-sub").value = subtitle;
+                if (author !== null)
+                    document.getElementById("inp-author").value = author;
+
+                if (titleSize !== null) {
+                    const v = Math.min(
+                        120,
+                        Math.max(24, parseInt(titleSize) || 96),
+                    );
+                    document.getElementById("sl-title").value = v;
+                    document.getElementById("val-title-size").textContent =
+                        v + "px";
+                }
+                if (subSize !== null) {
+                    const v = Math.min(
+                        72,
+                        Math.max(12, parseInt(subSize) || 48),
+                    );
+                    document.getElementById("sl-sub").value = v;
+                    document.getElementById("val-sub-size").textContent =
+                        v + "px";
+                }
+                if (authorSize !== null) {
+                    const v = Math.min(
+                        48,
+                        Math.max(10, parseInt(authorSize) || 24),
+                    );
+                    document.getElementById("sl-author").value = v;
+                    document.getElementById("val-author-size").textContent =
+                        v + "px";
+                }
+
+                if (theme !== null) {
+                    const found = THEMES.find((t) => t.id === theme);
+                    if (found) {
+                        activeTheme = found;
+                        document
+                            .querySelectorAll(".theme-btn")
+                            .forEach((btn) => {
+                                btn.classList.toggle(
+                                    "active",
+                                    btn.dataset.id === found.id,
+                                );
+                            });
+                    }
+                }
+
+                if (size !== null) {
+                    const found = SIZES.find((s) => s.id === size);
+                    if (found) {
+                        activeSize = found;
+                        document
+                            .querySelectorAll(".size-btn")
+                            .forEach((btn) => {
+                                btn.classList.toggle(
+                                    "active",
+                                    btn.dataset.id === found.id,
+                                );
+                            });
+                    }
+                }
+            })();
+        </script>
+    </body>
+</html>

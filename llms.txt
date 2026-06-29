@@ -1,0 +1,52 @@
+# Thumbnail Maker
+
+A browser-based tool that generates thumbnail images from text. No server required — all rendering happens in-browser via Canvas API.
+
+## How to use via URL
+
+Open `index.html` with query parameters to pre-fill inputs and trigger rendering automatically.
+
+### Query Parameters
+
+| Parameter   | Description                              | Default   | Values / Range         |
+|-------------|------------------------------------------|-----------|------------------------|
+| title       | Main title text (\n for line breaks)     | —         | any string             |
+| subtitle    | Subtitle text                            | —         | any string             |
+| author      | Author name (displayed bottom-right)     | —         | any string             |
+| theme       | Color theme                              | classic   | classic, dark, blue    |
+| size        | Canvas output size                       | note      | note, youtube, ogp, wide, square, twitter |
+| titleSize   | Title font size (px)                     | 96        | 24–120                 |
+| subSize     | Subtitle font size (px)                  | 48        | 12–72                  |
+| authorSize  | Author font size (px)                    | 24        | 10–48                  |
+
+### Canvas Sizes
+
+| ID       | Dimensions   | Use case              |
+|----------|--------------|-----------------------|
+| note     | 1280 × 670   | note.com article cover |
+| youtube  | 1280 × 720   | YouTube thumbnail      |
+| ogp      | 1200 × 630   | OGP / SNS card         |
+| wide     | 1280 × 512   | 5:2 wide banner        |
+| square   | 1080 × 1080  | Instagram square       |
+| twitter  | 1500 × 500   | Twitter header         |
+
+### Example URLs
+
+```
+index.html?title=AIが変える未来&subtitle=2025年の技術トレンド&author=山田花子&theme=dark&size=note
+index.html?title=Weekly%20Report&author=Taro&theme=blue&size=ogp&titleSize=80
+```
+
+## Download
+
+After opening the URL, click the **PNG / JPG / WebP / SVG** buttons on the page to download the rendered thumbnail.
+
+There is no programmatic download API — user interaction is required to trigger the file save.
+
+## Themes
+
+| ID      | Background | Text style             |
+|---------|------------|------------------------|
+| classic | White      | Dark text, blue accent |
+| dark    | Near-black | White text, blue accent |
+| blue    | Deep blue  | White text             |
