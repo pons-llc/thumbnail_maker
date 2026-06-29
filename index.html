@@ -8,6 +8,40 @@
             name="description"
             content="テキストを入力するだけでサムネイル画像を生成・ダウンロードできるツール。クエリパラメータで初期値を指定可能。"
         />
+
+        <!-- Open Graph / Facebook -->
+        <meta property="og:type" content="website" />
+        <meta
+            property="og:url"
+            content="https://pons-llc.github.io/thumbnail_maker/"
+        />
+        <meta property="og:title" content="サムネイルメーカー" />
+        <meta
+            property="og:description"
+            content="テキストを入力するだけでサムネイル画像を生成・ダウンロードできるツール。クエリパラメータで初期値を指定可能。"
+        />
+        <meta
+            property="og:image"
+            content="https://pons-llc.github.io/thumbnail_maker/thumbnail_maker_ogp_1200x630.jpg"
+        />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+
+        <!-- Twitter -->
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta
+            name="twitter:url"
+            content="https://pons-llc.github.io/thumbnail_maker/"
+        />
+        <meta name="twitter:title" content="サムネイルメーカー" />
+        <meta
+            name="twitter:description"
+            content="テキストを入力するだけでサムネイル画像を生成・ダウンロードできるツール。クエリパラメータで初期値を指定可能。"
+        />
+        <meta
+            name="twitter:image"
+            content="https://pons-llc.github.io/thumbnail_maker/thumbnail_maker_ogp_1200x630.jpg"
+        />
         <!--
           AI Usage Guide — Thumbnail Maker
           ==================================
@@ -100,6 +134,19 @@
             header span {
                 font-size: 0.875rem;
                 color: var(--neutral-600);
+            }
+            header .repo-link {
+                margin-left: auto;
+                display: inline-flex;
+                align-items: center;
+                gap: var(--spacing-2);
+                font-size: 0.875rem;
+                font-weight: 700;
+                color: var(--primary-blue-900);
+                text-decoration: none;
+            }
+            header .repo-link:hover {
+                text-decoration: underline;
             }
 
             .layout {
@@ -358,6 +405,25 @@
             </svg>
             <h1>サムネイルメーカー</h1>
             <span>テキストだけでいい人のやつ</span>
+            <a
+                class="repo-link"
+                href="https://github.com/pons-llc/thumbnail_maker"
+                target="_blank"
+                rel="noopener noreferrer"
+            >
+                <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    aria-hidden="true"
+                >
+                    <path
+                        d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58 0-.29-.01-1.04-.02-2.05-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.33-1.76-1.33-1.76-1.09-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.25 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.62-5.49 5.92.43.37.81 1.1.81 2.22 0 1.61-.01 2.9-.01 3.29 0 .32.21.7.82.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z"
+                    />
+                </svg>
+                GitHub
+            </a>
         </header>
 
         <div class="layout">
@@ -755,7 +821,8 @@ Webデザインの新潮流</textarea
                         .getElementById("inp-title")
                         .value.replace(/\s+/g, "_")
                         .slice(0, 20) || "thumbnail";
-                return `${title}.${ext}`;
+                const size = `${activeSize.id}_${activeSize.w}x${activeSize.h}`;
+                return `${title}_${size}.${ext}`;
             }
 
             function download(format) {
